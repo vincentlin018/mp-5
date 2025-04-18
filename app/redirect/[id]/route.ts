@@ -3,9 +3,9 @@ import { getUrlsCollection } from '@/db';
 
 export async function GET(
     _req: NextRequest,
-    context: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = context.params; // <-- await params
+    const { id } = await params; // Await params for compatibility with Next.js 15+
     const urls = await getUrlsCollection();
 
     const urlDoc = await urls.findOne({ alias: id });

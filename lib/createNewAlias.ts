@@ -9,7 +9,7 @@ import type { Document, WithId } from "mongodb";
  */
 async function isUrlAcceptable(url: string): Promise<boolean> {
     try {
-        // Try a HEAD request for efficiency (nobody), follow redirects
+        // Try a HEAD request for efficiency (no body), follow redirects
         let res = await fetch(url, { method: "HEAD", redirect: "follow" });
         // If HEAD is not allowed (405), fallback to GET
         if (res.status === 405) {
@@ -38,42 +38,48 @@ function serializeUrlDoc(doc: WithId<Document>): UrlProps {
 
 /**
  * Creates a new shortened URL alias in the database.
- * - Validates input
- * - Checks URL reachability
- * - Checks for duplicate alias
- * - Inserts new record
- * - Returns the created record as a plain object
+ * Returns { data } on success or { error } on failure.
  */
 export default async function createNewAlias(
     alias: string,
     originalUrl: string,
     createdAt: Date
-): Promise<UrlProps> {
+): Promise<{ data?: UrlProps; error?: string }> {
     // Validation: Ensure both alias and original URL are provided
     if (!alias || !originalUrl) {
-        throw new Error("Alias and URL are required.");
+        return { error: "Alias and URL are required." };
     }
 
     // Validation: Check if the original URL is syntactically valid
     try {
         new URL(originalUrl);
     } catch {
-        throw new Error("Invalid URL.");
+        return { error: "Invalid URL." };
     }
 
     // Validation: Check if the URL is reachable and returns a valid HTTP status
     const ok = await isUrlAcceptable(originalUrl);
     if (!ok) {
-        throw new Error("URL is not reachable or returned an invalid status code.");
+        return { error: "URL is not reachable or returned an invalid status code." };
     }
 
     // Get the MongoDB collection for URLs
-    const urlsCollection = await getCollection(URLS_COLLECTION);
+    let urlsCollection;
+    try {
+        urlsCollection = await getCollection(URLS_COLLECTION);
+    } catch {
+        return { error: "Database connection failed." };
+    }
 
     // Check if the alias already exists in the database
-    const existing = await urlsCollection.findOne({ alias });
+    let existing;
+    try {
+        existing = await urlsCollection.findOne({ alias });
+    } catch {
+        return { error: "Database query failed." };
+    }
     if (existing) {
-        throw new Error("Alias already taken.");
+        return { error: "Alias already taken." };
     }
 
     // Prepare the new document to insert
@@ -84,16 +90,23 @@ export default async function createNewAlias(
     };
 
     // Insert the new alias document into the collection
-    const res = await urlsCollection.insertOne(doc);
+    let res;
+    try {
+        res = await urlsCollection.insertOne(doc);
+    } catch {
+        return { error: "DB insert failed." };
+    }
 
     // Check if the insert was successful
     if (!res.acknowledged) {
-        throw new Error("DB insert failed");
+        return { error: "DB insert failed." };
     }
 
     // Return the inserted document as a serializable object
-    return serializeUrlDoc({
-        ...doc,
-        _id: res.insertedId, // Include the generated MongoDB _id
-    });
+    return {
+        data: serializeUrlDoc({
+            ...doc,
+            _id: res.insertedId, // Include the generated MongoDB _id
+        }),
+    };
 }

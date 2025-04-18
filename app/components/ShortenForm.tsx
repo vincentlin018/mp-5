@@ -30,17 +30,17 @@ export default function ShortenForm() {
             return;
         }
 
-        try {
-            const result = await createNewAlias(alias, url, new Date());
-            setShortUrl(`${baseUrl}/${result.alias}`);
-        }catch (err: unknown) {
-            if (err instanceof Error) {
-                setError(err.message);
-            } else {
-                setError('An error occurred.');
-            }
+        // Call the server action and check for error/data
+        const result = await createNewAlias(alias, url, new Date());
+        if (result.error) {
+            setError(result.error);
+        } else if (result.data) {
+            setShortUrl(`${baseUrl}/${result.data.alias}`);
+        } else {
+            setError('Unknown error occurred.');
         }
     }
+
 
     const handleCopy = async () => {
         if (shortUrl && typeof navigator !== "undefined" && navigator.clipboard) {

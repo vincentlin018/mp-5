@@ -33,8 +33,12 @@ export default function ShortenForm() {
         try {
             const result = await createNewAlias(alias, url, new Date());
             setShortUrl(`${baseUrl}/${result.alias}`);
-        } catch (err: any) {
-            setError(err.message || 'An error occurred.');
+        }catch (err: unknown) {
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError('An error occurred.');
+            }
         }
     }
 

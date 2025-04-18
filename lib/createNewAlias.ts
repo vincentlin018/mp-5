@@ -1,6 +1,7 @@
 "use server";
 import getCollection, { URLS_COLLECTION } from "@/db";
 import { UrlProps } from "@/types";
+import type { Document, WithId } from "mongodb";
 
 /**
  * Checks if a URL is reachable and returns an acceptable HTTP status.
@@ -8,7 +9,7 @@ import { UrlProps } from "@/types";
  */
 async function isUrlAcceptable(url: string): Promise<boolean> {
     try {
-        // Try a HEAD request for efficiency (no body), follow redirects
+        // Try a HEAD request for efficiency (nobody), follow redirects
         let res = await fetch(url, { method: "HEAD", redirect: "follow" });
         // If HEAD is not allowed (405), fallback to GET
         if (res.status === 405) {
@@ -23,17 +24,15 @@ async function isUrlAcceptable(url: string): Promise<boolean> {
 }
 
 // Helper function to convert a MongoDB document to a plain UrlProps object
-function serializeUrlDoc(doc: any): UrlProps {
+function serializeUrlDoc(doc: WithId<Document>): UrlProps {
     return {
-        id: doc._id ? doc._id.toString() : doc.id, // Use string id for consistency
-        alias: doc.alias,                          // Custom alias for the short URL
-        originalUrl: doc.originalUrl,              // The original long URL
+        id: doc._id ? doc._id.toString() : doc.id,
+        alias: doc.alias,
+        originalUrl: doc.originalUrl,
         createdAt:
             doc.createdAt instanceof Date
-                ? doc.createdAt.toISOString()      // Convert Date to ISO string
-                : typeof doc.createdAt === "string"
-                    ? doc.createdAt               // Already a string
-                    : new Date(doc.createdAt).toISOString(), // Convert timestamp to ISO string
+                ? doc.createdAt
+                : new Date(doc.createdAt),
     };
 }
 
